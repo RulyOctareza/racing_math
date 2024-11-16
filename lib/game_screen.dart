@@ -16,7 +16,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // Inisialisasi langsung saat deklarasi
   late final AnimationController _timerController = AnimationController(
     vsync: this,
-    duration: const Duration(seconds: 10),
+    duration: const Duration(seconds: 20),
   );
 
   late final Animation<double> _animation = CurvedAnimation(
