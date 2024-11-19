@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:get/get.dart';
+import 'package:racing_math/old/controller/stopwatch/stopwatch_display.dart';
+import 'package:racing_math/old/controller/stopwatch/stopwatch_service.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({
@@ -13,7 +17,6 @@ class GameScreen extends StatefulWidget {
 }
 
 class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
-  // Inisialisasi langsung saat deklarasi
   late final AnimationController _timerController = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 20),
@@ -23,6 +26,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     parent: _timerController,
     curve: Curves.linear,
   );
+
+  final StopwatchController _stopwatchController =
+      Get.find<StopwatchController>();
 
   List progress = [0.2, 0.4, 0.6, 0.8, 1];
   bool _isAnimating = false;
@@ -54,6 +60,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _stopwatchController.startStopwatch();
 
     // Tambahkan listener untuk timer
     _timerController.addStatusListener((status) {
@@ -107,21 +114,40 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         toastLength: Toast.LENGTH_LONG,
         gravity: ToastGravity.BOTTOM,
       );
-    } else if (userAnswer == correctAnswer) {
+      return;
+    }
+
+    if (userAnswer == correctAnswer) {
       Fluttertoast.showToast(
         msg: 'Jawaban benar!',
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
       );
-      generateQuestion();
+
+      setState(() {
+        answeredQuestions++;
+
+        // Cek apakah sudah 5 pertanyaan (1 lap selesai)
+        if (answeredQuestions == questionsPerLap) {
+          currentLap--;
+          answeredQuestions = 0;
+
+          // Cek apakah semua lap sudah selesai
+          if (currentLap == 0) {
+            _timerController.stop();
+            showNextLevelDialog();
+            return;
+          }
+        }
+      });
     } else {
       Fluttertoast.showToast(
         msg: 'Jawaban salah!',
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.SNACKBAR,
       );
-      generateQuestion();
     }
+    generateQuestion();
   }
 
   void showNextLevelDialog() {
@@ -135,11 +161,17 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             actions: [
               TextButton(
                 child: const Text('Tidak'),
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  showGameOverDialog();
+                },
               ),
               TextButton(
                 child: const Text('Ya'),
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  startNextLevel();
+                },
               ),
             ],
           );
@@ -158,18 +190,37 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void showGameOverDialog() {
-    showDialog(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: const Text('Game Selesai'),
-            content: const Text('Apakah anda ingin bermain kembali ?'),
-            actions: [
-              TextButton(onPressed: () {}, child: Text('Tidak')),
-              TextButton(onPressed: () {}, child: Text('Ya'))
-            ],
-          );
-        });
+    _stopwatchController.stopStopwatch();
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Game Selesai'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Apakah anda ingin bermain kembali?'),
+            Text('Waktu bermain: ${_stopwatchController.getCurrentTime()}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back(); // Close dialog
+              Get.back(); // Back to main menu
+            },
+            child: const Text('Tidak'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              resetGame();
+            },
+            child: const Text('Ya'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
   }
 
   void resetGame() {
@@ -179,7 +230,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       answeredQuestions = 0; // Reset the question
       _timerController.duration =
           Duration(seconds: getLevelDuration(currentLevelIndex));
+
+      _stopwatchController.resetStopwatch();
+      _stopwatchController.startStopwatch();
     });
+
     generateQuestion(); //generate pertanyaan baru untuk permainan baru
   }
 
@@ -198,7 +253,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       return AnimatedBuilder(
         animation: _animation,
         builder: (context, child) {
-          return Container(
+          return SizedBox(
             width: double.infinity,
             child: LinearProgressIndicator(
               value: 1.0 - _animation.value,
@@ -291,7 +346,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 padding: const EdgeInsets.all(8),
                 width: MediaQuery.of(context).size.width * 0.4,
                 height: 60,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                     borderRadius: BorderRadius.all(Radius.circular(8)),
                     color: Colors.black45),
                 child: Row(
@@ -299,7 +354,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(8),
                       width: MediaQuery.of(context).size.width * 0.2,
                       child: Text(
                         answer,
@@ -374,7 +429,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   children: [
                     Container(
                       height: 20,
-                      width: MediaQuery.of(context).size.width * progress[0],
+                      width: MediaQuery.of(context).size.width *
+                          progress[currentLevelIndex],
                       decoration: const BoxDecoration(
                         color: Colors.indigoAccent,
                       ),
@@ -422,17 +478,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     // TIME
                     const Flexible(
                       fit: FlexFit.tight,
-                      child: Text(
-                        '00:00',
-                        style: TextStyle(fontSize: 35),
-                      ),
+                      child: StopwatchDisplay(),
                     ),
 
                     //LAPS
-                    const Column(
+                    Column(
                       children: [
-                        Flexible(child: Text('0')),
-                        Flexible(child: Text('Laps')),
+                        Flexible(child: Text('$currentLap')),
+                        const Flexible(child: Text('Laps')),
                       ],
                     ),
 
