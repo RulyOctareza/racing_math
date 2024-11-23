@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:racing_math/data/bindings/game_bindings.dart';
 import 'package:racing_math/data/views/game_screen.dart';
+import 'package:racing_math/data/views/menu_screen.dart';
 
 void main() {
   runApp(const MyApp());
 }
+
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -21,11 +23,11 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       initialBinding: GameBinding(),
-      home: const GameScreen(),
+      home: const MenuScreen(),
       getPages: [
         GetPage(
           name: '/game',
-          page: () => const GameScreen(),
+          page: () => const MenuScreen(),
           binding: GameBinding(),
         ),
       ],

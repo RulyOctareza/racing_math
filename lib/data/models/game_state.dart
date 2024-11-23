@@ -7,7 +7,7 @@ import 'package:get/get.dart';
 class GameState {
   // Game state
   final RxInt currentLevel = 0.obs;
-  final RxInt currentLap = 3.obs;
+  final RxInt currentLap = 2.obs;
   final RxInt answeredQuestions = 0.obs;
   final RxInt score = 0.obs;
   final RxBool isPlaying = false.obs;
@@ -15,13 +15,17 @@ class GameState {
 
   // Constants
   static const int maxLevel = 3; // Game selesai setelah 3 level
-  static const int questionsPerLap = 5;
-  static const int initialLaps = 3;
-  static const int baseTimerDuration = 20;
+  static const int questionsPerLap = 3;
+  static const int initialLaps = 2;
+  static const int baseTimerDuration = 15;
   static const int timerDecrementPerLevel = 3;
 
   // Progress tracking
-  final List<double> progressSteps = [0.2, 0.4, 0.6, 0.8, 1.0];
+  final List<double> progressSteps = [
+    0.2,
+    0.6,
+    0.9,
+  ];
 
   // Method untuk mendapatkan durasi timer berdasarkan level
   int getTimerDuration() {

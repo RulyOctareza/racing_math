@@ -1,22 +1,31 @@
-// lib/features/game/controllers/game_controller.dart
-
 import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:racing_math/data/controllers/race_controller.dart';
 import 'package:racing_math/data/models/game_state.dart';
 
 class GameController extends GetxController with GetTickerProviderStateMixin {
-  // State
+  // Game State
   final gameState = GameState();
   final Rx<Question> currentQuestion = Question(number1: 0, number2: 0).obs;
   final RxString userAnswer = ''.obs;
+
+  // final RaceTrackController raceTrackController =
+  //     Get.find<RaceTrackController>();
+
+  // Timer State
+  final RxString gameTime = '00:00'.obs;
+  final RxDouble progressValue = 0.0.obs;
+  final RxBool isTimerRunning = false.obs;
+
+  Timer? gameTimer;
+  final stopwatch = Stopwatch();
 
   // Animation controllers
   late final AnimationController timerController;
   late final Animation<double> timerAnimation;
 
-  // Numpad
+  // Numpad configuration
   final List<String> numberPad = [
     '1',
     '2',
@@ -32,11 +41,6 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
     'DEL'
   ];
 
-  // Timer variables
-  final RxString gameTime = '00:00'.obs;
-  Timer? gameTimer;
-  final stopwatch = Stopwatch();
-
   @override
   void onInit() {
     super.onInit();
@@ -44,35 +48,76 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
     startGame();
   }
 
-  void startGame() {
-    gameState.isPlaying.value = true;
-    startGameTimer();
-    generateNewQuestion();
-  }
+  void _initializeTimerAnimation() {
+    timerController = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: gameState.getTimerDuration()),
+    );
 
-  void startGameTimer() {
-    stopwatch.start();
-    gameTimer = Timer.periodic(const Duration(milliseconds: 1000), (_) {
-      updateGameTime();
+    timerAnimation = CurvedAnimation(
+      parent: timerController,
+      curve: Curves.linear,
+    );
+
+    // Update progress value for UI
+    timerController.addListener(() {
+      progressValue.value = timerController.value;
+    });
+
+    timerController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        handleTimeUp();
+      }
     });
   }
 
-  void updateGameTime() {
+  void startGameTimer() {
+    if (!isTimerRunning.value) {
+      isTimerRunning.value = true;
+      stopwatch.start();
+
+      // Optimized timer dengan interval 100ms
+      gameTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+        if (stopwatch.isRunning) {
+          _updateGameTime();
+        }
+      });
+    }
+  }
+
+  void _updateGameTime() {
     int milliseconds = stopwatch.elapsedMilliseconds;
     int seconds = (milliseconds / 1000).floor();
     int minutes = (seconds / 60).floor();
     seconds = seconds % 60;
 
-    gameTime.value =
+    // Update hanya jika nilai berubah
+    String newTime =
         '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    if (gameTime.value != newTime) {
+      gameTime.value = newTime;
+    }
   }
 
   void pauseGameTimer() {
+    isTimerRunning.value = false;
     stopwatch.stop();
     gameTimer?.cancel();
+    timerController.stop();
+  }
+
+  void resumeGameTimer() {
+    isTimerRunning.value = true;
+    stopwatch.start();
+    timerController.forward();
+    startGameTimer();
   }
 
   void resetGameTimer() {
+    stopwatch.reset();
+    timerController.reset();
+    gameTime.value = '00:00';
+    progressValue.value = 0.0;
     generateNewQuestion();
   }
 
@@ -84,23 +129,12 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
     super.onClose();
   }
 
-  void _initializeTimerAnimation() {
-    timerController = AnimationController(
-      vsync: this,
-       duration: Duration(seconds: gameState.getTimerDuration()),
-    );
-
-    timerAnimation = CurvedAnimation(
-      parent: timerController,
-      curve: Curves.linear,
-    );
-    
-
-    timerController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        handleTimeUp();
-      }
-    });
+  // Game Logic Methods
+  void startGame() {
+    // _initializeTimerAnimation();
+    gameState.isPlaying.value = true;
+    startGameTimer();
+    generateNewQuestion();
   }
 
   void generateNewQuestion() {
@@ -111,12 +145,15 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
     timerController.reset();
     timerController.forward();
 
+    // Mengurangi delay animasi
     Future.delayed(const Duration(milliseconds: 500), () {
       gameState.isAnimating.value = false;
     });
   }
 
   void handleNumberPadInput(String value) {
+    if (!isTimerRunning.value) return; // Prevent input when timer is paused
+
     if (value == 'DEL') {
       if (userAnswer.value.isNotEmpty) {
         userAnswer.value =
@@ -128,6 +165,8 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
   }
 
   void checkAnswer() {
+    if (!isTimerRunning.value) return;
+
     if (userAnswer.value.isEmpty) {
       Get.snackbar(
         'Peringatan',
@@ -146,7 +185,10 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
   }
 
   void handleCorrectAnswer() {
-    // Update score berdasarkan sisa waktu
+    final raceTrackController = Get.find<RaceTrackController>();
+    raceTrackController.boostSpeed();
+
+    // Calculate score based on remaining time
     int timeRemaining =
         (timerController.duration!.inSeconds * (1 - timerController.value))
             .round();
@@ -177,34 +219,46 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
       'Jawaban kamu salah',
       backgroundColor: Colors.red,
       colorText: Colors.white,
+      duration: const Duration(seconds: 1),
     );
     generateNewQuestion();
   }
 
   void handleTimeUp() {
-    Get.snackbar(
-      'Waktu Habis!',
-      'Silakan coba lagi',
-      snackPosition: SnackPosition.BOTTOM,
-    );
+    // raceTrackController.setSlowSpeed();
+
+    // Get.snackbar(
+    //   'Waktu Habis!',
+    //   'Silakan coba lagi',
+    //   snackPosition: SnackPosition.BOTTOM,
+    //   duration: const Duration(seconds: 1),
+    // );
     generateNewQuestion();
   }
 
   void showNextLevelDialog() {
+    pauseGameTimer();
     Get.dialog(
       AlertDialog(
         title: const Text('Level Selesai!'),
-        content: const Text('Lanjut ke level berikutnya?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Score: ${gameState.score.value}'),
+            const SizedBox(height: 5),
+            Text('Waktu: ${gameTime.value}'),
+          ],
+        ),
         actions: [
           TextButton(
-            child: const Text('Tidak'),
+            child: const Text('Menu Utama'),
             onPressed: () {
               Get.back();
-              showGameCompleteDialog();
+              Get.back();
             },
           ),
           TextButton(
-            child: const Text('Ya'),
+            child: const Text('Level Berikutnya'),
             onPressed: () {
               Get.back();
               startNextLevel();
@@ -217,7 +271,7 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
   }
 
   void showGameCompleteDialog() {
-    pauseGameTimer(); // Pause the timer when game is complete
+    pauseGameTimer();
     Get.dialog(
       AlertDialog(
         title: const Text('Game Selesai!'),
@@ -244,7 +298,6 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
             onPressed: () {
               Get.back();
               resetGame();
-              resetGameTimer();
             },
           ),
         ],
@@ -258,9 +311,10 @@ class GameController extends GetxController with GetTickerProviderStateMixin {
     gameState.currentLap.value = GameState.initialLaps;
     gameState.answeredQuestions.value = 0;
 
-    // Update timer duration untuk level baru
-    timerController.duration = Duration(seconds: gameState.getTimerDuration());
+    // raceTrackController.resetForNewLevel();
 
+    timerController.duration = Duration(seconds: gameState.getTimerDuration());
+    resumeGameTimer();
     generateNewQuestion();
   }
 

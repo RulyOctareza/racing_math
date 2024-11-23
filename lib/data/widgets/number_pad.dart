@@ -15,7 +15,7 @@ class NumberPad extends GetView<GameController> {
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            childAspectRatio: 1.6,
+            childAspectRatio: 2,
             crossAxisSpacing: 8,
             mainAxisSpacing: 8,
           ),

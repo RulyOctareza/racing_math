@@ -20,28 +20,27 @@ class GameHeader extends GetView<GameController> {
         children: [
           // Left Button
           Flexible(
-            child: IconButton(
-              onPressed: () {
-                Get.back();
+            child: GestureDetector(
+              onTap: () {
                 Get.back();
               },
-              icon: const Icon(
+              child: const Icon(
                 Icons.keyboard_arrow_left,
-                size: 28,
+                size: 45,
+                color: Colors.white,
               ),
-              color: Colors.white,
             ),
           ),
 
           // Reset Button
           Flexible(
-            child: IconButton(
-              onPressed: controller.resetGame,
-              icon: const Icon(
+            child: GestureDetector(
+              onTap: controller.resetGame,
+              child: const Icon(
                 Icons.autorenew_rounded,
-                size: 22,
+                color: Colors.white,
+                size: 30,
               ),
-              color: Colors.white,
             ),
           ),
 
