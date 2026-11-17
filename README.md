@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/preview/hero.png" alt="Racing Math — ilustrasi game balapan matematika" width="100%">
+  <img src="docs/preview/hero.svg" alt="Racing Math — ilustrasi game balapan matematika" width="100%">
 </p>
 
 <h1 align="center">Racing Math</h1>
